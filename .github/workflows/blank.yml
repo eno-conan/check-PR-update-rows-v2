@@ -1,0 +1,26 @@
+name: Check Pull Request Size
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  check-pr-size:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Get PR Size
+        id: pr_size
+        run: |
+          SIZE=$(git --no-pager diff --shortstat HEAD $(git merge-base HEAD ${{ github.event.pull_request.base.sha }}) | awk '{print $4}')
+          echo "::set-output name=size::$SIZE"
+
+      - name: Check PR Size
+        run: |
+          if [ ${{ steps.pr_size.outputs.size }} -gt 30 ]; then
+            echo "PR size exceeds the limit of 30 lines. Please reduce the size of the PR and try again."
+            exit 1
+          fi
