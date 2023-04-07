@@ -1,29 +1,27 @@
-name: Check PR diff size
+name: Pull Request Size Limit
+
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened]
 
 jobs:
-  check-diff-size:
+  size_check:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+    - uses: actions/checkout@v2
 
-      - name: Diff PR with main
-        run: git diff --name-only origin/main..HEAD > pr-diff.txt
+    - name: Count changed lines
+      run: |
+        CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
+        NUM_CHANGED_LINES=$(git diff --shortstat HEAD^ HEAD | awk '{print $4}')
+        echo "::set-output name=changed_files::$CHANGED_FILES"
+        echo "::set-output name=num_changed_lines::$NUM_CHANGED_LINES"
 
-      - name: Count line changes
-        run: |
-          while read filename; do
-            lines=$(git diff origin/main..HEAD $filename | grep -E '^\+[^+]' | wc -l)
-            echo "$filename: $lines"
-          done < pr-diff.txt > lines-changed.txt
-
-      - name: Check line changes
-        run: |
-          lines=$(cat lines-changed.txt | awk -F ":" '{sum += $2} END {print sum}')
-          if [[ $lines -gt 30 ]]; then
-            echo "Error: PR changes exceed the maximum of 30 lines."
-            exit 1
-          fi
+    - name: Check pull request size
+      run: |
+        NUM_CHANGED_LINES=${{ steps.size_check.outputs.num_changed_lines }}
+        if [ "$NUM_CHANGED_LINES" -gt 30 ]; then
+          echo "Error: Pull request exceeds size limit (30 lines changed)."
+          exit 1
+        fi
